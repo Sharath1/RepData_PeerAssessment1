@@ -1,94 +1,57 @@
-
-## Loading and preprocessing the data
-
-The first step is to download the data, extract the zip file, and prepare the data set
-```{r}
 library(sqldf)
+
 download.file("Activity_Data.zip", 
               url = "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip")
 
 unzip(zipfile = "Activity_Data.zip")
+
 activity <- read.csv("activity.csv")
+
+class(activity$date)
+
+# Converting Date from factor to POSIXct
+
 activity$date <- as.POSIXct(activity$date, format = '%Y-%m-%d')
+
+# Assigning relevant column names and adding a field which shows the day of the week
 activity <- data.frame(date = activity$date, weekday = weekdays(activity$date), 
                        steps = activity$steps, interval = activity$interval)
-```
 
-
-## What is mean total number of steps taken per day?
-
-1. The prepared data set is then taken to aggregate the total number of steps by date
-
-```{r}
-
+#Aggregate the total number of steps per day
 daily_activity <- aggregate(activity$steps, by = list(activity$date), FUN = sum, 
                             na.rm = TRUE)
-
 names(daily_activity) <- c("Date", "Agg_activity")
-
-```
-
-2. The aggregated data is then used to create a plot
-
-```{r}
 
 hist(daily_activity$Agg_activity, xlab = "Total number of steps", 
      main = "Histogram of total number of steps taken each day", col = "red", 
      breaks = seq(from = 0, to = 25000, by = 2500))
 
-```
-                           
-3. The mean and median are computed using the R code below; mean is 9354 and 10395
-
-```{r}
-
 mean(daily_activity$Agg_activity)
 median(daily_activity$Agg_activity)
 
-```
 
-## What is the average daily activity pattern?
 
-1. The average daily pattern plot is created using the R code below:
-
-```{r}
-
+#Create a new subset of data to aggregate steps by intervals
 activity_mean <- aggregate(activity$steps, by = list(activity$interval), 
                            FUN = mean, na.rm = TRUE)
 
 names(activity_mean) <- c("interval", "mean_steps")
 
-
 plot(activity_mean$interval, activity_mean$mean_steps, type = "l", col = "green", 
      lwd = 2, xlab = "Interval (minutes)", ylab = "Average number of steps", 
      main = "Average number of steps per intervals")
 
-
-```
-
-2. The 5-minute interval which contains the maximum number of steps is 835. This can be seen using the code below:
-
-```{r}
-
+#Finding the 5-minute interval that contains the maximum average number of steps
 activity_mean[which(activity_mean$mean_steps ==max(activity_mean$mean_steps)),1]
 
+# Finding the interval with the maximum number of steps on average across all days, is 835
 max_step_int <- activity_mean[which.max(activity_mean$mean_steps),]
 
-```
 
-## Imputing missing values
+# The next step is to impute missing values for missing steps with 'NA', this could work
+# by replacing NA with 0, but that would sway the average so we replace the average of 
+# each interval
 
-
-1. Total number of missing values in the data set is 2304
-
-``` {r}
-sum(is.na(activity$steps))
-
-```
-
-2. The missing values in the data are replaced by the mean for the 5 minute interval
-
-``` {r}
 activity_with_NA <- activity[(is.na(activity$steps)),]
 activity_without_NA <- activity[!(is.na(activity$steps)),]
 
@@ -99,20 +62,9 @@ activity_with_NA_imp <- sqldf("SELECT date, weekday, mean_steps, interval
 
 names(activity_with_NA_imp)[names(activity_with_NA_imp) == "mean_steps"] <- "steps"
 
-```
-
-3. A new dataset is created
-
-```{r}
+rbind(activity_with_NA_imp,activity_without_NA)
 
 activity_imputed <- rbind(activity_with_NA_imp,activity_without_NA)
-
-```
-
-4. The histogram is then created with the imputed data
-
-
-``` {r}
 
 daily_act_imputed <- aggregate(activity_imputed$steps, 
                                by=list(activity_imputed$date), FUN = sum)
@@ -123,28 +75,11 @@ hist(daily_act_imputed$Agg_activity, xlab = "Total number of steps",
      (NA was replaced with mean)", col = "red", 
      breaks = seq(from = 0, to = 25000, by = 2500))
 
-```
-
-
-Also, the mean and median of the imputed data is calculated. 
-
-With this estimated values imputed in the data and the mean and median are completely different
-
-The mean is 10766, which is greater than the mean with missing values 9354
-The median is 10766, which is also greater than the median with missing values 10395
-
-``` {r}
-
 mean(daily_act_imputed$Agg_activity)
 median(daily_act_imputed$Agg_activity)
 
-```
 
-## Are there differences in activity patterns between weekdays and weekends?
-
-1. We have created a new variable daytype which will determine whether or not the date is a weekday or not
-
-``` {r}
+# The days are split into weekdays and weekends
 
 activity_imputed <- cbind(activity_imputed, 
                           daytype = ifelse(activity_imputed$weekday
@@ -152,12 +87,6 @@ activity_imputed <- cbind(activity_imputed,
                           activity_imputed$weekday == "Sunday"
                           , "weekend", "weekday"))
 
-```
-
-2. A plot is then created containing the time series
-
-``` {r}
-library(lattice)
 activity_mean <- aggregate(activity_imputed$steps,
                            by = list(activity_imputed$daytype, 
                                      activity_imputed$weekday, 
@@ -170,4 +99,4 @@ xyplot(mean_steps ~ interval | daytype,
        xlab = "Interval", ylab = "Number of steps", 
        layout = c(1,2))
 
-```
+
